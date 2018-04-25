@@ -39,7 +39,7 @@ def getUserInfo(userList):
         break
 
 if __name__=="__main__":
-  filename = "./soundcloud-hiphop.html"
+  filename = "./data/soundcloud-hiphop.html"
   userList = getUsers(filename)
   getUserInfo(userList)
 
