@@ -31,16 +31,19 @@ def getUserInfo(userList):
     response = urllib.urlopen('https://soundcloud.com/'+user)
     html = response.read()
     html = html.split('\n')
-    print(html)
+    #print(html)
     for line in html:
-      match_tmp = re.match("(<script>webpackJsonp\(\[\],)(.*?)(\);<\/script>)",line)
+      match_tmp = re.match("(\ \ <script>webpackJsonp\(\[\],)(.*?)(\);<\/script>)",line)
+      #print(line)
       if match_tmp:
-        print(match_tmp)
+        json_tmp = match_tmp.group(2)
+        print(json_tmp)
+        print(json.load(json_tmp))
         break
 
 if __name__=="__main__":
   filename = "./data/soundcloud-hiphop.html"
   userList = getUsers(filename)
-  getUserInfo(userList)
+  getUserInfo(['robotrump'])
 
   
