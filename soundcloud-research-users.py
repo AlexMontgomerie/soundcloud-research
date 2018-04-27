@@ -23,15 +23,38 @@ def getSearchResults(searchUrl):
   if SCROLL:
     last_height = browser.execute_script("return document.body.scrollHeight")
     scroll_index = 0
+    '''
     while True:
       scroll_index += 1
       print("Scroll Index: "+str(scroll_index))
       browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
       time.sleep(SCROLL_PAUSE_TIME)
       new_height = browser.execute_script("return document.body.scrollHeight")
-      if new_height == last_height:
-        break
+      timeout = 0
+      timeout_max = 100000000000
+      while new_height!=last_height:
+        timeout+=1
+        if timeout==timeout_max:
+          print('timeout on scroll')
+          break
+      if timeout==timeout_max:
+        break 
+      timeout = 0
       last_height = new_height
+    '''
+    last_height = browser.execute_script("return document.body.scrollHeight")
+    timeout = 0
+    timeout_max = 1000000
+    while True:
+      timeout+=1
+      browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+      new_height = browser.execute_script("return document.body.scrollHeight")
+      if timeout>=timeout_max:
+        break
+      if new_height != last_height:
+        scroll_index += 1
+        print("Scroll Index: "+str(scroll_index))
+        last_height = new_height
 
   html = browser.page_source
   browser.quit()
@@ -68,13 +91,13 @@ def getUsers(filename):
 
 if __name__=="__main__":
   #search query
-  searchUrl = "https://soundcloud.com/search/people?q=hip%20hop"
+  searchUrl = "https://soundcloud.com/search/people?q=hip%20hop&filter.place=london"
   #get search results
   getSearchResults(searchUrl)
   #find users
   userList = getUsers('./data/user-page.html')
   #save to a file
   json.dumps(userList)
-  with open('./data/users.json', 'w') as outfile:
+  with open('./data/users.json', 'a') as outfile:
     json.dump(userList, outfile, indent=4, sort_keys=True) 
 
