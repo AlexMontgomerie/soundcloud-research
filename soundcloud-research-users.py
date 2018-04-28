@@ -5,7 +5,9 @@ import urllib
 from selenium.webdriver import Firefox 
 from selenium.webdriver.firefox.options import Options
 from bs4 import BeautifulSoup
+import requests
 import time
+
 
 SCROLL_PAUSE_TIME = 1 
 
@@ -23,28 +25,9 @@ def getSearchResults(searchUrl):
   if SCROLL:
     last_height = browser.execute_script("return document.body.scrollHeight")
     scroll_index = 0
-    '''
-    while True:
-      scroll_index += 1
-      print("Scroll Index: "+str(scroll_index))
-      browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-      time.sleep(SCROLL_PAUSE_TIME)
-      new_height = browser.execute_script("return document.body.scrollHeight")
-      timeout = 0
-      timeout_max = 100000000000
-      while new_height!=last_height:
-        timeout+=1
-        if timeout==timeout_max:
-          print('timeout on scroll')
-          break
-      if timeout==timeout_max:
-        break 
-      timeout = 0
-      last_height = new_height
-    '''
     last_height = browser.execute_script("return document.body.scrollHeight")
     timeout = 0
-    timeout_max = 1000000
+    timeout_max = 1000
     while True:
       timeout+=1
       browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -52,6 +35,7 @@ def getSearchResults(searchUrl):
       if timeout>=timeout_max:
         break
       if new_height != last_height:
+        timeout = 0
         scroll_index += 1
         print("Scroll Index: "+str(scroll_index))
         last_height = new_height
@@ -89,15 +73,62 @@ def getUsers(filename):
       userList.append(match_tmp.group(2)) 
   return userList
 
-if __name__=="__main__":
-  #search query
-  searchUrl = "https://soundcloud.com/search/people?q=hip%20hop&filter.place=london"
-  #get search results
-  getSearchResults(searchUrl)
-  #find users
-  userList = getUsers('./data/user-page.html')
-  #save to a file
-  json.dumps(userList)
-  with open('./data/users.json', 'a') as outfile:
-    json.dump(userList, outfile, indent=4, sort_keys=True) 
+def getUsers2(filename):
+  f = open(filename,'r')
+  userList = []
+  soup = BeautifulSoup(f,"lxml")
+  for item in soup.find_all('li'):
+    if item.h2:
+      user = item.h2.a['href'].replace('/','')
+      print('new user, '+user)
+      userList.append(user)
+  return userList
 
+def saveUserList(filename,userList,organise=False):
+  data = open(filename).read()
+  existingUserList = json.load(open(filename))
+  userList.extend(existingUserList)
+  if organise:
+    userList = list(set(userList))
+  json.dumps(userList)
+  with open(filename, 'w') as outfile:
+    json.dump(userList, outfile, indent=4) 
+
+def getFollowers(user):
+  userList = []
+  r = requests.get("https://soundcloud.com/"+user+"/followers")
+  soup = BeautifulSoup(r.text, "lxml") 
+  for item in soup.find_all("a",itemprop="url"):
+    user = item['href'].replace('/','')
+    print('new user, '+user)
+    userList.append(user)
+  return userList
+
+def getFollowing(user):
+  userList = []
+  r = requests.get("https://soundcloud.com/"+user+"/following")
+  soup = BeautifulSoup(r.text, "lxml") 
+  for item in soup.find_all("a",itemprop="url"):
+    user = item['href'].replace('/','')
+    print('new user, '+user)
+    userList.append(user)
+  return userList
+
+if __name__=="__main__":
+  #getFollowers('alexmontgomerie')
+  #getFollowing('alexmontgomerie')
+  #cleanUserList('./data/users.json')
+  #search query
+  searchUrl = "https://soundcloud.com/search/people?q=islington"
+  #get search results
+  #getSearchResults(searchUrl)
+  #find users
+  #userList = getUsers2('./data/user-page.html')
+  #save to a file
+  #saveUserList('./data/users.json',userList)
+  ''' 
+  for user in userList:
+    saveUserList('./data/users.json',getFollowers(user))
+    saveUserList('./data/users.json',getFollowing(user))
+  '''
+  saveUserList('./data/users.json',[],organise=True)

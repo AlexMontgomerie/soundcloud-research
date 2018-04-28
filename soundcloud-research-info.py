@@ -2,6 +2,10 @@
 import re
 import json
 import urllib
+from bs4 import BeautifulSoup
+import requests
+from selenium import webdriver
+import dryscrape
 
 regexGenres = [
   [re.compile(r"([H,h]ip [H,h]op)"),'hip hop'],
@@ -111,10 +115,38 @@ def getUserInfo(userList):
   
   return data
 
+def getUserInfo2(user):
+  #r = requests.get("https://soundcloud.com/"+user)
+  driver = webdriver.PhantomJS()
+  driver.get("https://soundcloud.com/"+user)
+  soup = BeautifulSoup(driver.text,"lxml") 
+
+  userDict = {
+    "followings_count"      : 0,
+    "followers_count"       : 0,
+    "track_count"           : 0,
+    "reposts_count"         : 0,
+    "playlist_count"        : 0,
+    "comments_count"        : 0,
+    "city"                  : "",
+    "description"           : "",
+    "likes_count"           : 0,
+    "playlist_likes_count"  : 0,
+    "username"              : "",
+    "skills"                : [],
+    "genres"                : []
+  }
+  
+  #if(soup.find("table",class_="infoStats__table sc-type-small")):
+  if(soup.find_all("tbody")): 
+    print('here')
+   
+
 if __name__=="__main__":
-  userList = json.load(open('./data/users.json'))
-  data = getUserInfo(userList)
+  #userList = json.load(open('./data/users.json'))
+  #data = getUserInfo(userList)
+  getUserInfo2('bluenoterecords')
   #data = getUserInfo(['dipsartist'])
-  json.dumps(data)
-  with open('./data/user-data.json', 'w') as outfile:
-    json.dump(data, outfile, indent=4, sort_keys=True) 
+  #json.dumps(data)
+  #with open('./data/user-data.json', 'w') as outfile:
+  #  json.dump(data, outfile, indent=4, sort_keys=True) 
