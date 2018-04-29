@@ -4,23 +4,27 @@ import json
 import urllib
 from bs4 import BeautifulSoup
 import requests
-from selenium import webdriver
 import dryscrape
+from selenium.webdriver import Firefox 
+from selenium.webdriver.firefox.options import Options
+from urllib.parse import urlparse
 
 regexGenres = [
-  [re.compile(r"([H,h]ip [H,h]op)"),'hip hop'],
+  [re.compile(r"([H,h]ip[\ -][H,h]op)"),'hip hop'],
   [re.compile(r"([R,r]ap)"),'rap'],
   [re.compile(r"([J,j]azz)"),'jazz'],
   [re.compile(r"([R,r]ock)"),'rock'],
   [re.compile(r"([H,h]ouse)"),'house'],
-  [re.compile(r"([E,e]lectronic)"),'electronic']
+  [re.compile(r"([E,e]lectronic)"),'electronic'],
+  [re.compile(r"([G,r]ime)"),'grime']
   ]
 
 regexSkills = [
   [re.compile(r"([P,p]roducer)"),'producer'],
   [re.compile(r"([R,r]apper)"),'rapper'],
   [re.compile(r"([S,s]ing)"),'singer'],
-  [re.compile(r"([G,g]uitar)"),'guitarist']
+  [re.compile(r"([G,g]uitar)"),'guitarist'],
+  [re.compile(r"([D,d][J,j])"),'dj'] 
   ]
 
 def getUserInfo(userList):
@@ -115,37 +119,33 @@ def getUserInfo(userList):
   
   return data
 
-def getUserInfo2(user):
-  #r = requests.get("https://soundcloud.com/"+user)
-  driver = webdriver.PhantomJS()
-  driver.get("https://soundcloud.com/"+user)
-  soup = BeautifulSoup(driver.text,"lxml") 
+def getUserInfo2(browser,userDict):
+  browser.get("https://soundcloud.com/"+userDict['user'])
+  response = browser.page_source
+  soup = BeautifulSoup(response, "lxml")
 
-  userDict = {
-    "followings_count"      : 0,
-    "followers_count"       : 0,
-    "track_count"           : 0,
-    "reposts_count"         : 0,
-    "playlist_count"        : 0,
-    "comments_count"        : 0,
-    "city"                  : "",
-    "description"           : "",
-    "likes_count"           : 0,
-    "playlist_likes_count"  : 0,
-    "username"              : "",
-    "skills"                : [],
-    "genres"                : []
-  }
+  userDict['links'] = []
+ 
+  for item in soup.find_all("li", class_="web-profiles__item"):
+    res = urlparse(item.div.a['href'])
+    if res.scheme=='mailto':
+      userDict['links'].append(res.path)
+    if res.scheme=='https':
+      userDict['links'].append(res.query) 
   
-  #if(soup.find("table",class_="infoStats__table sc-type-small")):
-  if(soup.find_all("tbody")): 
-    print('here')
-   
+  return userDict
 
 if __name__=="__main__":
   #userList = json.load(open('./data/users.json'))
   #data = getUserInfo(userList)
-  getUserInfo2('bluenoterecords')
+  #open webpage
+  opts = Options()
+  opts.set_headless()
+  assert opts.headless
+  browser = Firefox(options=opts)
+
+  print(getUserInfo2(browser,{'user':'bluenoterecords'}))
+  print(getUserInfo2(browser,{'user':'alexmontgomerie'}))
   #data = getUserInfo(['dipsartist'])
   #json.dumps(data)
   #with open('./data/user-data.json', 'w') as outfile:

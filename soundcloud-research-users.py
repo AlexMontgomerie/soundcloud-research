@@ -75,44 +75,61 @@ def getUsers(filename):
 
 def getUsers2(filename):
   f = open(filename,'r')
-  userList = []
+  userDict = {}
   soup = BeautifulSoup(f,"lxml")
   for item in soup.find_all('li'):
     if item.h2:
       user = item.h2.a['href'].replace('/','')
       print('new user, '+user)
-      userList.append(user)
-  return userList
+      userDict[user] = {}
+  return userDict
 
-def saveUserList(filename,userList,organise=False):
+def saveUserList(filename,userDict):
   data = open(filename).read()
-  existingUserList = json.load(open(filename))
-  userList.extend(existingUserList)
-  if organise:
-    userList = list(set(userList))
-  json.dumps(userList)
+  existingUserDict = json.load(open(filename))
+  userDict.update(existingUserDict)
+  json.dumps(userDict)
   with open(filename, 'w') as outfile:
-    json.dump(userList, outfile, indent=4) 
+    json.dump(userDict, outfile, indent=4) 
 
-def getFollowers(user):
+def getFollowers(userDict):
+  globalUserList = []
+  for key in userDict:
+    userList = []
+    r = requests.get("https://soundcloud.com/"+key+"/followers")
+    soup = BeautifulSoup(r.text, "lxml") 
+    for item in soup.find_all("a",itemprop="url"):
+      user = item['href'].replace('/','')
+      if user != key:
+        print('new user, '+user)
+        userList.append(user)
+  
+    userDict[key]['followers'] = userList
+    globalUserList.extend(userList)
+
+  returnDict = {}
+  for user in globalUserList:
+    returnDict[user]={}
+  return returnDict
+  #return [{user} for user in userList]
+
+def getFollowing(userDict):
   userList = []
-  r = requests.get("https://soundcloud.com/"+user+"/followers")
+  r = requests.get("https://soundcloud.com/"+userDict['user']+"/following")
   soup = BeautifulSoup(r.text, "lxml") 
   for item in soup.find_all("a",itemprop="url"):
     user = item['href'].replace('/','')
     print('new user, '+user)
     userList.append(user)
-  return userList
+  
+  userDict['following'] = userList
+  
+  return [{'user':user} for user in userList]
 
-def getFollowing(user):
-  userList = []
-  r = requests.get("https://soundcloud.com/"+user+"/following")
-  soup = BeautifulSoup(r.text, "lxml") 
-  for item in soup.find_all("a",itemprop="url"):
-    user = item['href'].replace('/','')
-    print('new user, '+user)
-    userList.append(user)
-  return userList
+searchList =[ 'https://soundcloud.com/search/people?q=islington',
+              'https://soundcloud.com/search/people?q=hackney',
+              'https://soundcloud.com/search/people?q=hip%20hop&filter.place=london'
+            ]
 
 if __name__=="__main__":
   #getFollowers('alexmontgomerie')
@@ -123,12 +140,14 @@ if __name__=="__main__":
   #get search results
   #getSearchResults(searchUrl)
   #find users
-  #userList = getUsers2('./data/user-page.html')
+  #userDict = getUsers2('./data/user-page.html')
   #save to a file
-  #saveUserList('./data/users.json',userList)
+  userDict = {"benzo-enzo": {}}
+  userDict.update(getFollowers(userDict))
+  saveUserList('./data/users.json',userDict)
+  
   ''' 
   for user in userList:
     saveUserList('./data/users.json',getFollowers(user))
     saveUserList('./data/users.json',getFollowing(user))
   '''
-  saveUserList('./data/users.json',[],organise=True)
