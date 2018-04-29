@@ -264,6 +264,72 @@ class SoundCloud:
     with open(filename, 'w') as outfile:
       json.dump(userList, outfile, indent=4) 
 
+  def scrollPage(self):
+    last_height = self.browser.execute_script("return document.body.scrollHeight")
+    scroll_index = 0
+    timeout = 0
+    timeout_max = 1000
+    while True:
+      timeout+=1
+      self.browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+      new_height = self.browser.execute_script("return document.body.scrollHeight")
+      if timeout>=timeout_max:
+        break
+      if new_height != last_height:
+        timeout = 0
+        scroll_index += 1
+        print("Scroll Index: "+str(scroll_index))
+        last_height = new_height
+
+  def getFollowersAll(self,update=True,forceUpdate=False):
+    globalUserList = []
+    for key in self.userDict:
+      if self.userDict[key]!={} and not forceUpdate:
+        continue
+      userList = []
+      self.browser.get('https://soundcloud.com/'+key+'/followers')
+      self.scrollPage()
+      html = self.browser.page_source
+      soup = BeautifulSoup(html, "lxml") 
+      for item in soup.find_all("a",itemprop="url"):
+        user = item['href'].replace('/','')
+        if user != key:
+          print('new user, '+user)
+          userList.append(user)
+  
+      self.userDict[key]['followers'] = userList
+      globalUserList.extend(userList)
+
+    if update:
+      for user in globalUserList:
+        if user not in self.userDict:
+          self.userDict[user] = {}
+
+  def getFollowingAll(self,update=True,forceUpdate=False):
+    globalUserList = []
+    for key in self.userDict:
+      if self.userDict[key]!={} and not forceUpdate:
+        continue
+      userList = []
+      self.browser.get('https://soundcloud.com/'+key+'/following')
+      self.scrollPage()
+      html = self.browser.page_source
+      soup = BeautifulSoup(html, "lxml") 
+      for item in soup.find_all("a",itemprop="url"):
+        user = item['href'].replace('/','')
+        if user != key:  
+          print('new user, '+user)
+          userList.append(user)
+  
+      self.userDict[key]['following'] = userList
+      globalUserList.extend(userList)
+ 
+    if update:
+      for user in globalUserList:
+        if user not in self.userDict:
+          self.userDict[user] = {}
+
+   
 
 searchList =[ 'https://soundcloud.com/search/people?q=islington',
               'https://soundcloud.com/search/people?q=hackney',
