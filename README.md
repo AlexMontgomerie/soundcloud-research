@@ -2,19 +2,20 @@
 
 This is a tool to gather information on users on soundcloud and help obtain primary research on musicians within london.
 
-# Gathering Data
-The `soundcloud-research-user.py` script contains a script to automatically scroll and gather usernames of soundcloud users. 
+# Script dependencies
+To install all dependencies, firstly you must have python 3.5 running. You will also need to download python libraries, which can be done by:
+```
+sudo pip3 install requirements.txt
+```
 
 # Example Script
-
-the soundcloud-research.py file holds all functions used to gather data. Try the following script in your command line interface (note, you will need to have python 2.7 installed).
+The `soundcloud-research.py` script contains a class which holds all the functions to execute collecting the relevant information. Usage is shown below:
 
 ```
-python3 soundcloud-research-users.py
-python soundcloud-research-info.py
+python3 soundcloud-research-users.py -s <search url> -o <output file location>
 ```
+an example search url would be `https://soundcloud.com/search/people?q=london` and output file such as `./data/users.json`.
 
 # TODO
- - someway of removing duplicates in the user list
- - create a dictionary for users and their information
- - method to parse description for genres and skills
+ - add messaging automation
+ - collect track information

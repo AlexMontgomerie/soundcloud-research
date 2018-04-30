@@ -1,4 +1,5 @@
 #import libraries: json, re, url
+import sys, getopt
 import re
 import json
 import urllib
@@ -8,6 +9,7 @@ from bs4 import BeautifulSoup
 import requests
 import time
 from urllib.parse import urlparse
+from urllib.parse import unquote
 
 class SoundCloud:
   def __init__(self,filename,BROWSER=False):
@@ -44,6 +46,8 @@ class SoundCloud:
     #open webpage
     self.browser.get(searchUrl)
 
+    self.scrollPage()
+    '''
     if self.SCROLL:
       last_height = self.browser.execute_script("return document.body.scrollHeight")
       scroll_index = 0
@@ -60,7 +64,7 @@ class SoundCloud:
           scroll_index += 1
           print("Scroll Index: "+str(scroll_index))
           last_height = new_height
-
+    '''
     html = self.browser.page_source
     self.currPage = html    
     
@@ -92,12 +96,16 @@ class SoundCloud:
       json.dump(tmpDict, outfile, indent=4) 
 
   def loadUserDict(self):
-    self.userDict = json.load(open(self.dataFilename))
+    try:
+      self.userDict = json.load(open(self.dataFilename))
+    except FileNotFoundError:
+      self.userDict = {}
+      self.saveUserDict()
 
   def getFollowers(self,update=True,forceUpdate=False):
     globalUserList = []
     for key in self.userDict:
-      if self.userDict[key]!={} and not forceUpdate:
+      if 'followers' in self.userDict[key] and not forceUpdate:
         continue
       userList = []
       r = requests.get("https://soundcloud.com/"+key+"/followers")
@@ -119,7 +127,7 @@ class SoundCloud:
   def getFollowing(self,update=True,forceUpdate=False):
     globalUserList = []
     for key in self.userDict:
-      if self.userDict[key]!={} and not forceUpdate:
+      if 'following' in self.userDict[key] and not forceUpdate:
         continue
       userList = []
       r = requests.get("https://soundcloud.com/"+key+"/following")
@@ -142,7 +150,7 @@ class SoundCloud:
   
     #go through all users
     for user in self.userDict:
-      if self.userDict[user]!={} and not forceUpdate:
+      if 'username' in self.userDict[user] and not forceUpdate:
         continue
       print('processing user: '+user)
       response = requests.get('https://soundcloud.com/'+user)
@@ -171,22 +179,22 @@ class SoundCloud:
               self.userDict[user]["country_code"] = country_code[1][1]
 
           if followings_count:
-            self.userDict[user]["followings_count"] = followings_count.group(2)
+            self.userDict[user]["followings_count"] = int(followings_count.group(2).replace(',',''))
 
           if followers_count:
-            self.userDict[user]["followers_count"] = followers_count.group(2)
+            self.userDict[user]["followers_count"] = int(followers_count.group(2).replace(',',''))
 
           if track_count:
-            self.userDict[user]["track_count"] = track_count.group(2)
+            self.userDict[user]["track_count"] = int(track_count.group(2).replace(',',''))
           
           if reposts_count:
-            self.userDict[user]["reposts_count"] = reposts_count.group(2)
+            self.userDict[user]["reposts_count"] = int(reposts_count.group(2).replace(',',''))
   
           if playlist_count:
-            self.userDict[user]["playlist_count"] = playlist_count.group(2)
+            self.userDict[user]["playlist_count"] = int(playlist_count.group(2).replace(',',''))
 
           if comments_count:
-            self.userDict[user]["comments_count"] = comments_count.group(2)
+            self.userDict[user]["comments_count"] = int(comments_count.group(2).replace(',',''))
 
           if city:
             if len(city)==2:
@@ -194,7 +202,21 @@ class SoundCloud:
 
           if description:
             self.userDict[user]["description"] = description.group(2)
-            
+
+          if likes_count:
+            self.userDict[user]["likes_count"] = int(likes_count.group(2).replace(',',''))
+
+          if playlist_likes_count:
+            self.userDict[user]["playlist_likes_count"] = int(playlist_likes_count.group(2).replace(',',''))
+
+          if username:
+            self.userDict[user]["username"] = username.group(2) 
+ 
+          #parse description
+       
+          break
+
+  '''
             self.userDict[user]["skills"] = []
             self.userDict[user]["genres"] = []
             
@@ -207,24 +229,12 @@ class SoundCloud:
               genre_tmp = regex[0].search(self.userDict[user]["description"])
               if genre_tmp:
                 self.userDict[user]["genres"].append(regex[1])
- 
-          if likes_count:
-            self.userDict[user]["likes_count"] = likes_count.group(2)
-
-          if playlist_likes_count:
-            self.userDict[user]["playlist_likes_count"] = playlist_likes_count.group(2)
-
-          if username:
-            self.userDict[user]["username"] = username.group(2) 
- 
-          #parse description
-       
-          break
+  '''
 
   #TODO: clean up returned links 
   def getUserInfoLinks(self,forceUpdate=False):
     for user in self.userDict:
-      if self.userDict[user]!={} and not forceUpdate:
+      if 'links' in self.userDict[user] and not forceUpdate:
         continue
       print('processing user (links): '+user)
       self.browser.get("https://soundcloud.com/"+user)
@@ -234,9 +244,12 @@ class SoundCloud:
       for item in soup.find_all("li", class_="web-profiles__item"):
         res = urlparse(item.div.a['href'])
         if res.scheme=='mailto':
-          self.userDict[user]['links'].append(res.path)
+          if 'emails' in self.userDict[user]:
+            self.userDict[user]['emails'].append(res.path)
+          else:
+            self.userDict[user]['emails'] = [res.path]
         if res.scheme=='https':
-          self.userDict[user]['links'].append(res.query) 
+          self.userDict[user]['links'].append(unquote(res.query.replace('url=',''))) 
 
 
   def filterCountryCode(self,countryCode='GB'):
@@ -252,6 +265,35 @@ class SoundCloud:
       print('removing '+user)
       del self.userDict[user] 
     print('Number Removed: '+str(rm_count))
+
+  def filterTrackCount(self,trackCount=0):
+    rm_count = 0
+    rmList = []
+    for user in self.userDict:
+      if 'track_count' in self.userDict[user]:
+        if self.userDict[user]['track_count'] <= trackCount:
+         rmList.append(user)
+    
+    for user in rmList:
+      rm_count+=1
+      print('removing '+user)
+      del self.userDict[user] 
+    print('Number Removed: '+str(rm_count))
+
+  def filterFollowerSize(self,followerSizeMax=50000):
+    rm_count = 0
+    rmList = []
+    for user in self.userDict:
+      if 'followers_count' in self.userDict[user]:
+        if self.userDict[user]['followers_count'] >= followerSizeMax:
+         rmList.append(user)
+    
+    for user in rmList:
+      rm_count+=1
+      print('removing '+user)
+      del self.userDict[user] 
+    print('Number Removed: '+str(rm_count))
+
 
   def getUserDictSize(self):
     return len(self.userDict)
@@ -291,8 +333,8 @@ class SoundCloud:
       self.scrollPage()
       html = self.browser.page_source
       soup = BeautifulSoup(html, "lxml") 
-      for item in soup.find_all("a",itemprop="url"):
-        user = item['href'].replace('/','')
+      for item in soup.find_all("div",class_="userBadgeListItem__title"):
+        user = item.a['href'].replace('/','')
         if user != key:
           print('new user, '+user)
           userList.append(user)
@@ -315,8 +357,8 @@ class SoundCloud:
       self.scrollPage()
       html = self.browser.page_source
       soup = BeautifulSoup(html, "lxml") 
-      for item in soup.find_all("a",itemprop="url"):
-        user = item['href'].replace('/','')
+      for item in soup.find_all("div",class_="userBadgeListItem__title"):
+        user = item.a['href'].replace('/','')
         if user != key:  
           print('new user, '+user)
           userList.append(user)
@@ -329,23 +371,63 @@ class SoundCloud:
         if user not in self.userDict:
           self.userDict[user] = {}
 
-   
+  def getEmailFromDescription(self,forceUpdate=False):
+    emailRegex = re.compile(r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)")
+    for user in self.userDict:
+      if 'emails' in self.userDict[user] and not forceUpdate:
+        continue
+      self.userDict[user]['emails'] = []
+      if 'description' in self.userDict[user]:
+        email_tmp = emailRegex.findall(self.userDict[user]['description']) 
+        self.userDict[user]['emails'].extend(email_tmp)
+
+  def runSearch(self,searchUrl):
+    self.loadUserDict()
+    self.getSearchResults(searchUrl)
+    self.getUsers() 
+    self.updateUserDict()
+    self.getFollowersAll()
+    self.updateUserDict()
+    self.getUserInfo() 
+    print(self.getUserDictSize())
+    self.updateUserDict()
+    self.filterCountryCode()
+    self.filterTrackCount()
+    self.filterFollowerSize()
+    self.updateUserDict()
+    self.getEmailFromDescription()
+    self.updateUserDict()
+    self.getUserInfoLinks()
+    self.updateUserDict()
+    print(self.getUserDictSize())
+    self.updateUserDict()
 
 searchList =[ 'https://soundcloud.com/search/people?q=islington',
               'https://soundcloud.com/search/people?q=hackney',
               'https://soundcloud.com/search/people?q=hip%20hop&filter.place=london'
             ]
 
+def main(argv):
+  searchUrl = ''
+  fileLocation = ''
+  
+  try:
+    opts,args = getopt.getopt(argv,"hs:o:")
+  except getopt.GetoptError:
+    print('soundcloud-research.py -s <search url> -o <output location>')
+    sys.exit(2)
+  for opt,arg in opts:
+    if opt == '-h':
+      print('soundcloud-research.py -s <search url> -o <output location>')
+      sys.exit()
+    elif opt in ('-s'):
+      searchUrl = arg
+    elif opt in ('-o'):
+      fileLocation = arg
+
+  sc = SoundCloud(fileLocation,BROWSER=True)
+  #sc = SoundCloud('./data/users.json')
+  sc.runSearch(searchUrl)
+
 if __name__=="__main__":
-  searchUrl = "https://soundcloud.com/search/people?q=islington"
-  sc = SoundCloud('./data/users.json')
-  #sc.getSearchResults(searchUrl)
-  sc.loadUserDict()
-  #sc.getUsers() 
-  #sc.getUserInfo() 
-  #sc.getUserInfoLinks()
-  sc.getFollowers()
-  sc.getUserInfo() 
-  sc.filterCountryCode()
-  print(sc.getUserDictSize())
-  sc.updateUserDict()
+  main(sys.argv[1:])
